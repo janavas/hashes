@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Valdehierro Tech · Hashes filtrados</title>
+<style>
+  :root{
+    --bg:#0f2235; --panel:#16314a; --panel2:#1d3c5a; --ink:#eaf1f8;
+    --muted:#9db4c9; --green:#1f9e74; --green-ink:#7ff0c2;
+    --amber:#d98a1f; --red:#d2493f; --line:#2a4a68; --accent:#2e8b9e;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.5; padding:24px 16px 60px;
+  }
+  .wrap{max-width:860px; margin:0 auto}
+  header h1{font-size:1.7rem; margin:0 0 4px}
+  header p{color:var(--muted); margin:0 0 24px}
+  .mono{font-family:ui-monospace,SFMono-Regular,Consolas,Menlo,monospace}
+
+  .lab{
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:14px; padding:20px; margin-bottom:24px;
+  }
+  .lab h2{margin:0 0 14px; font-size:1.1rem}
+  .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+  input[type=text]{
+    flex:1 1 260px; min-width:220px; padding:12px 14px; font-size:1.05rem;
+    border-radius:10px; border:1px solid var(--line); background:#0c1b2b;
+    color:var(--ink); font-family:inherit;
+  }
+  input[type=text]:focus{outline:2px solid var(--accent); border-color:var(--accent)}
+  button{
+    padding:12px 20px; font-size:1.05rem; font-weight:600; cursor:pointer;
+    border:none; border-radius:10px; background:var(--accent); color:#fff;
+  }
+  button:hover{filter:brightness(1.1)}
+  .out{margin-top:14px; min-height:46px}
+  .huella{
+    font-size:.9rem; word-break:break-all; background:#0c1b2b;
+    border:1px solid var(--line); border-radius:8px; padding:10px 12px;
+  }
+  .verdict{margin-top:10px; font-weight:700}
+  .hit{color:var(--green-ink)}
+  .miss{color:var(--muted)}
+
+  .targets h2{font-size:1.1rem; margin:0 0 12px}
+  .hint{color:var(--muted); font-size:.9rem; margin:0 0 16px}
+  .card{
+    display:flex; align-items:center; gap:14px; background:var(--panel);
+    border:1px solid var(--line); border-left:5px solid var(--line);
+    border-radius:10px; padding:12px 14px; margin-bottom:10px;
+  }
+  .card.cracked{border-left-color:var(--green); background:var(--panel2)}
+  .num{
+    flex:0 0 34px; height:34px; border-radius:50%; background:#0c1b2b;
+    border:1px solid var(--line); display:flex; align-items:center;
+    justify-content:center; font-weight:700;
+  }
+  .card.cracked .num{background:var(--green); border-color:var(--green); color:#04120c}
+  .hash{flex:1 1 auto; font-size:.82rem; word-break:break-all; color:var(--muted)}
+  .reveal{flex:0 0 auto; font-weight:700; color:var(--green-ink); font-size:1.05rem}
+  .reveal .pw{font-family:ui-monospace,Consolas,monospace}
+  .pending{flex:0 0 auto; color:var(--muted)}
+
+  .score{margin:18px 0 0; font-size:1.1rem}
+  .score b{color:var(--green-ink)}
+  .finale{
+    margin-top:18px; padding:14px 16px; border-radius:10px;
+    background:#3a2410; border:1px solid var(--amber); color:#f3d8a8;
+    display:none;
+  }
+  .finale.show{display:block}
+  footer{margin-top:28px; color:var(--muted); font-size:.82rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🔓 Hashes filtrados · Valdehierro Tech</h1>
+    <p>Habéis robado el fichero de contraseñas del servidor. No trae las contraseñas: trae sus <b>hashes</b>. A ver cuántos descifráis.</p>
+  </header>
+
+  <section class="lab">
+    <h2>Laboratorio: calcula el hash de una contraseña</h2>
+    <div class="row">
+      <input id="pw" type="text" placeholder="Escribe una contraseña a probar..." autocomplete="off" spellcheck="false">
+      <button id="go">Calcular hash</button>
+    </div>
+    <div class="out" id="out"></div>
+  </section>
+
+  <section class="targets">
+    <h2>🎯 Los 5 hashes robados</h2>
+    <p class="hint">Probad contraseñas del diccionario que os he dado. Cuando el hash de una coincida con uno de estos, se pondrá en verde solo.</p>
+    <div id="cards"></div>
+    <div class="score">Descifrados: <b id="count">0</b> / 5</div>
+    <div class="finale" id="finale">
+      Lleváis 4 de 5. El último se resiste… y sin embargo su contraseña <b>sí</b> está en vuestra lista. 🤔
+      ¿Por qué no lo encontráis? Avisad al profesor.
+    </div>
+  </section>
+
+  <footer>
+    Todo se calcula en vuestro navegador. Nada sale de este equipo. SHA-256, el mismo algoritmo de la Tarea 2.
+  </footer>
+</div>
+
+<script>
+// Los 5 hashes "robados". El 5o lleva sal (Kp9) y por eso no cae con el diccionario.
+const TARGETS = [
+  {h:"74a36486aeae455122c70442cce90d9c66880ea426de605be2a71aa40fa4ca6b", pw:null},
+  {h:"240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9", pw:null},
+  {h:"65e84be33532fb784c48129675f9eff3a682b27168c0ea744b2cf58ee02337c5", pw:null},
+  {h:"2e7645c5bd72a28b745d6c86ee4943223df43c7d656af1321deccdcae06ebe8d", pw:null},
+  {h:"c464479c41e4e124b4b3f78d62c271338082f8ef393835b25fd2009ce1932d7d", pw:null}
+];
+
+// SHA-256 en JavaScript puro (no depende de crypto.subtle, funciona al abrir
+// el archivo con doble clic sin servidor ni conexión).
+function sha256(ascii){
+  function rr(n,x){return (x>>>n)|(x<<(32-n));}
+  const bytes=[], words=[];
+  const utf8=unescape(encodeURIComponent(ascii));
+  for(let i=0;i<utf8.length;i++) bytes.push(utf8.charCodeAt(i)&0xff);
+  const bitLen=bytes.length*8;
+  bytes.push(0x80);
+  while(bytes.length%64!==56) bytes.push(0);
+  for(let i=7;i>=0;i--) bytes.push((bitLen/Math.pow(2,i*8))&0xff);
+  for(let i=0;i<bytes.length;i+=4)
+    words.push((bytes[i]<<24)|(bytes[i+1]<<16)|(bytes[i+2]<<8)|bytes[i+3]);
+
+  const k=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+  let h=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+
+  for(let i=0;i<words.length;i+=16){
+    const w=words.slice(i,i+16);
+    for(let t=16;t<64;t++){
+      const s0=rr(7,w[t-15])^rr(18,w[t-15])^(w[t-15]>>>3);
+      const s1=rr(17,w[t-2])^rr(19,w[t-2])^(w[t-2]>>>10);
+      w[t]=(w[t-16]+s0+w[t-7]+s1)|0;
+    }
+    let [a,b,c,d,e,f,g,hh]=h;
+    for(let t=0;t<64;t++){
+      const S1=rr(6,e)^rr(11,e)^rr(25,e);
+      const ch=(e&f)^((~e)&g);
+      const t1=(hh+S1+ch+k[t]+w[t])|0;
+      const S0=rr(2,a)^rr(13,a)^rr(22,a);
+      const maj=(a&b)^(a&c)^(b&c);
+      const t2=(S0+maj)|0;
+      hh=g;g=f;f=e;e=(d+t1)|0;d=c;c=b;b=a;a=(t1+t2)|0;
+    }
+    h=[a,b,c,d,e,f,g,hh].map((x,j)=>(x+h[j])|0);
+  }
+  return h.map(x=>(x>>>0).toString(16).padStart(8,"0")).join("");
+}
+
+const cardsBox = document.getElementById("cards");
+const countEl  = document.getElementById("count");
+const finaleEl = document.getElementById("finale");
+
+function renderCards(){
+  cardsBox.innerHTML = "";
+  let cracked = 0;
+  TARGETS.forEach((t,i)=>{
+    const div = document.createElement("div");
+    div.className = "card" + (t.pw ? " cracked" : "");
+    div.innerHTML =
+      `<div class="num">${i+1}</div>`+
+      `<div class="hash mono">${t.h}</div>`+
+      (t.pw
+        ? `<div class="reveal">✔ <span class="pw">${t.pw}</span></div>`
+        : `<div class="pending">— sin descifrar —</div>`);
+    cardsBox.appendChild(div);
+    if(t.pw) cracked++;
+  });
+  countEl.textContent = cracked;
+  finaleEl.classList.toggle("show", cracked === 4);
+}
+
+async function probar(){
+  const pw = document.getElementById("pw").value;
+  const out = document.getElementById("out");
+  if(!pw){ out.innerHTML = ""; return; }
+  const hash = await sha256(pw);
+  let hitIndex = -1;
+  TARGETS.forEach((t,i)=>{ if(t.h === hash){ t.pw = pw; hitIndex = i; } });
+  out.innerHTML =
+    `<div class="huella mono">${hash}</div>`+
+    (hitIndex >= 0
+      ? `<div class="verdict hit">✔ ¡COINCIDE con el hash nº ${hitIndex+1}! Contraseña descifrada.</div>`
+      : `<div class="verdict miss">✗ Esta huella no está entre las robadas. Prueba otra.</div>`);
+  renderCards();
+}
+
+document.getElementById("go").addEventListener("click", probar);
+document.getElementById("pw").addEventListener("keydown", e=>{ if(e.key==="Enter") probar(); });
+renderCards();
+</script>
+</body>
+</html>
